@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	mgo "gopkg.in/mgo.v2"
 
@@ -26,7 +28,12 @@ var session *mgo.Session
 var err error
 
 func init() {
-	session, err = mgo.Dial("localhost")
+	server := os.Getenv("MONGO_SERVER_URL")
+	if server == "" {
+		server = "localhost"
+	}
+	log.Println("Connecting to mongo on: " + server + ":27017")
+	session, err = mgo.Dial(server + ":27017")
 	if err != nil {
 		panic(err)
 	}
@@ -49,8 +56,13 @@ func main() {
 	ensureIndex(session)
 
 	router := NewRouter()
-	log.Println("Server running on port :3000")
-	http.ListenAndServe(":3000", router)
+	port := os.Getenv("PORT")
+	log.Println(port)
+	if port == "" {
+		port = "3000"
+	}
+	log.Printf("Server running on port :%s\n", port)
+	http.ListenAndServe(":"+port, router)
 }
 
 func deleteBook(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -120,6 +132,10 @@ func allBooks(w http.ResponseWriter, r *http.Request, params httprouter.Params) 
 	books, err := getAllBooks()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if len(books) == 0 {
+		fmt.Fprintf(w, "[]")
 		return
 	}
 	json.NewEncoder(w).Encode(books)
